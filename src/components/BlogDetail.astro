@@ -1,0 +1,130 @@
+---
+import type { BlogEntry } from '../lib/blog';
+import { readingTime } from '../lib/blog';
+import { render } from 'astro:content';
+import { getLangFromUrl, t } from '../i18n/utils';
+import { defaultLang, type Lang } from '../i18n/ui';
+
+interface Props {
+  post: BlogEntry;
+}
+
+const lang: Lang = getLangFromUrl(Astro.url) ?? defaultLang;
+const { post } = Astro.props;
+
+const backHref = lang === defaultLang ? '/blog' : `/${lang}/blog`;
+const { title, description, tags, date } = post.data;
+const locale = lang === defaultLang ? 'de-DE' : 'en-US';
+const minutes = readingTime(post.body);
+const readingLabel = t(lang, 'blog.reading_time').replace('{minutes}', String(minutes));
+const { Content } = await render(post);
+---
+
+<section class="post-head">
+  <a class="back" href={backHref}>← {t(lang, 'blog.back')}</a>
+  <h1>{title}</h1>
+  <p class="desc">{description}</p>
+  <div class="meta">
+    <time datetime={date.toISOString()}>
+      {new Intl.DateTimeFormat(locale, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }).format(date)}
+    </time>
+    <span class="dot" aria-hidden="true">·</span>
+    <span>{readingLabel}</span>
+    {
+      tags.length > 0 && (
+        <ul class="tags" aria-label={t(lang, 'blog.tags')}>
+          {tags.map((tag) => (
+            <li class="tag">{tag}</li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+</section>
+
+<article class="prose">
+  <Content />
+</article>
+
+<style>
+  .post-head {
+    padding-block: 1.5rem 1.25rem;
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: 2rem;
+  }
+  .back {
+    display: inline-block;
+    font-size: 0.875rem;
+    color: var(--color-muted);
+    margin-bottom: 0.75rem;
+  }
+  .back:hover {
+    color: var(--color-accent);
+    text-decoration: none;
+  }
+  h1 {
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.02em;
+  }
+  .desc {
+    color: var(--color-muted);
+    margin: 0 0 1rem;
+    max-width: 42rem;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    align-items: center;
+    color: var(--color-muted);
+    font-size: 0.9rem;
+  }
+  .dot {
+    color: var(--color-border);
+  }
+  .tags {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .tag {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    color: var(--color-muted);
+  }
+  :global(.prose) {
+    max-width: 44rem;
+  }
+  :global(.prose h2) {
+    margin-top: 2rem;
+    margin-bottom: 0.5rem;
+    font-size: 1.35rem;
+  }
+  :global(.prose p),
+  :global(.prose ul) {
+    color: var(--color-text);
+  }
+  :global(.prose ul) {
+    padding-left: 1.25rem;
+  }
+  :global(.prose li) {
+    margin: 0.2rem 0;
+  }
+  :global(.prose code) {
+    font-family: var(--font-mono);
+    background: var(--color-surface);
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.25rem;
+    font-size: 0.9em;
+  }
+</style>

@@ -1,0 +1,35 @@
+# Caddyfile for Railway.
+# Railway terminates TLS at the edge and forwards plain HTTP to the container
+# on the dynamic $PORT, so we listen on that port and serve the static build.
+
+{
+	# Disable Caddy's own auto-HTTPS – Railway handles TLS upstream.
+	auto_https off
+	admin off
+	log {
+		output stdout
+		format console
+	}
+}
+
+:{$PORT} {
+	root * /site
+
+	# Serve precompressed gzip/br files when present (Astro can emit them).
+	encode gzip zstd
+
+	# Astro emits directory-style URLs (e.g. /blog/foo/index.html).
+	# try_files resolves clean URLs and falls back to 404.html if present.
+	try_files {path} {path}/ /404.html
+
+	# Long-cache immutable hashed assets.
+	@assets {
+		path /_astro/* /favicon.svg
+	}
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	# Reasonable default cache for everything else.
+	header Cache-Control "public, max-age=300"
+
+	file_server
+}

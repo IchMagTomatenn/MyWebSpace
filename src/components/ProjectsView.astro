@@ -1,0 +1,55 @@
+---
+import { getLangFromUrl, t } from '../i18n/utils';
+import { defaultLang, type Lang } from '../i18n/ui';
+import { getProjectsByLang } from '../lib/projects';
+import ProjectCard from './ProjectCard.astro';
+
+const lang: Lang = getLangFromUrl(Astro.url) ?? defaultLang;
+const projects = await getProjectsByLang(lang);
+---
+
+<section class="projects-head">
+  <h1>{t(lang, 'projects.title')}</h1>
+  <p class="lead">{t(lang, 'projects.subtitle')}</p>
+</section>
+
+{
+  projects.length === 0 ? (
+    <p class="empty">{t(lang, 'projects.empty')}</p>
+  ) : (
+    <ul class="grid">
+      {projects.map((project) => (
+        <li>
+          <ProjectCard project={project} lang={lang} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+<style>
+  .projects-head {
+    padding-block: 2rem 1.5rem;
+  }
+  .projects-head h1 {
+    font-size: clamp(2rem, 5vw, 3rem);
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.02em;
+  }
+  .lead {
+    color: var(--color-muted);
+    margin: 0;
+  }
+  .grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  }
+  .empty {
+    color: var(--color-muted);
+    padding-block: 2rem;
+  }
+</style>

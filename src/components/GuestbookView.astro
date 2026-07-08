@@ -1,0 +1,185 @@
+---
+import { getLangFromUrl, t } from '../i18n/utils';
+import { defaultLang, type Lang } from '../i18n/ui';
+import { siteConfig } from '../config';
+
+const lang: Lang = getLangFromUrl(Astro.url) ?? defaultLang;
+
+const remark42 = siteConfig.remark42;
+const host = remark42?.host;
+const siteId = remark42?.siteId ?? 'mywebspace';
+const ready = Boolean(host);
+const contactFallbackHref = lang === defaultLang ? '/contact' : `/${lang}/contact`;
+---
+
+<section class="guestbook-head">
+  <h1>{t(lang, 'guestbook.title')}</h1>
+  <p class="lead">{t(lang, 'guestbook.subtitle')}</p>
+  <p class="intro">{t(lang, 'guestbook.intro')}</p>
+</section>
+
+{
+  ready ? (
+    <div
+      class="guestbook-embed"
+      data-remark42-host={host}
+      data-remark42-site={siteId}
+      data-remark42-locale={lang}
+      data-remark42-loading={t(lang, 'guestbook.loading')}
+      data-remark42-error={t(lang, 'guestbook.error')}
+    >
+      <noscript>
+        <p class="remark42-noscript">
+          {t(lang, 'guestbook.error')}
+        </p>
+      </noscript>
+      <p class="remark42-loading" role="status" aria-live="polite">
+        {t(lang, 'guestbook.loading')}
+      </p>
+    </div>
+  ) : (
+    <div class="guestbook-fallback">
+      <h2>{t(lang, 'guestbook.fallback.title')}</h2>
+      <p>{t(lang, 'guestbook.fallback.body')}</p>
+      <a class="btn btn-primary" href={contactFallbackHref}>
+        {t(lang, 'guestbook.fallback.button')}
+      </a>
+    </div>
+  )
+}
+
+<script is:inline>
+  (function () {
+    var container = document.querySelector('.guestbook-embed');
+    if (!container) return;
+    var host = container.getAttribute('data-remark42-host');
+    var siteId = container.getAttribute('data-remark42-site');
+    var locale = container.getAttribute('data-remark42-locale') || 'de';
+    var loadingText = container.getAttribute('data-remark42-loading') || '';
+    var errorText = container.getAttribute('data-remark42-error') || '';
+    if (!host) return;
+
+    var remark_config = {
+      host: host,
+      site_id: siteId,
+      url: host.replace(/\/$/, '') + '/guestbook',
+      components: ['embed'],
+      locale: locale,
+      theme: document.documentElement.classList.contains('dark')
+        ? 'dark'
+        : 'light',
+      max_shown: 25,
+      show_email_subscription: false,
+    };
+    window.REMARK42 = remark_config;
+
+    (function (c, d) {
+      for (var i = 0; i < c.length; i++) {
+        var s = d.createElement('script');
+        s.async = true;
+        s.defer = true;
+        s.src = host + '/web/' + c[i] + '.js';
+        (d.head || d.body).appendChild(s);
+      }
+    })(['embed'], document);
+
+    // Hide local loading placeholder once Remark42 mounts its own node.
+    var placeholder = container.querySelector('.remark42-loading');
+    var observer = new MutationObserver(function () {
+      var injected = container.querySelector('#remark42');
+      if (injected && placeholder) {
+        placeholder.hidden = true;
+        observer.disconnect();
+      }
+    });
+    observer.observe(container, { childList: true, subtree: true });
+
+    // Surface a friendly message if the widget fails to load (timeout fallback).
+    window.setTimeout(function () {
+      var injected = container.querySelector('#remark42');
+      if (!injected && placeholder) {
+        placeholder.textContent = errorText;
+        placeholder.classList.add('err');
+      }
+    }, 12000);
+  })();
+</script>
+
+<style>
+  .guestbook-head {
+    padding-block: 2rem 1.5rem;
+  }
+  .guestbook-head h1 {
+    font-size: clamp(2rem, 5vw, 3rem);
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.02em;
+  }
+  .lead {
+    color: var(--color-muted);
+    margin: 0 0 0.75rem;
+    max-width: 42rem;
+  }
+  .intro {
+    color: var(--color-muted);
+    margin: 0;
+    max-width: 42rem;
+    font-size: 0.95rem;
+  }
+
+  .guestbook-embed {
+    margin-block: 1rem 3rem;
+    min-height: 12rem;
+    padding: 1.25rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+  }
+  .remark42-loading {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.95rem;
+  }
+  .remark42-loading.err {
+    color: #dc2626;
+  }
+  .remark42-noscript {
+    margin: 0;
+    color: #dc2626;
+    font-size: 0.95rem;
+  }
+
+  .guestbook-fallback {
+    padding: 1.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    max-width: 36rem;
+  }
+  .guestbook-fallback h2 {
+    font-size: 1.15rem;
+    margin: 0 0 0.5rem;
+  }
+  .guestbook-fallback p {
+    color: var(--color-muted);
+    margin: 0 0 1rem;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 0.65rem 1.2rem;
+    border-radius: var(--radius);
+    font-weight: 600;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: transform var(--transition), background-color var(--transition),
+      border-color var(--transition);
+  }
+  .btn:hover {
+    text-decoration: none;
+    transform: translateY(-1px);
+  }
+  .btn-primary {
+    background: var(--color-accent);
+    color: var(--color-accent-contrast);
+  }
+</style>

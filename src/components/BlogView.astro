@@ -1,0 +1,77 @@
+---
+import { getLangFromUrl, t } from '../i18n/utils';
+import { defaultLang, type Lang } from '../i18n/ui';
+import { getPostsByLang } from '../lib/blog';
+import BlogCard from './BlogCard.astro';
+
+const lang: Lang = getLangFromUrl(Astro.url) ?? defaultLang;
+const posts = await getPostsByLang(lang);
+const rssHref = lang === defaultLang ? '/rss.xml' : `/${lang}/rss.xml`;
+---
+
+<section class="blog-head">
+  <h1>{t(lang, 'blog.title')}</h1>
+  <p class="lead">{t(lang, 'blog.subtitle')}</p>
+  <a class="rss" href={rssHref} type="application/rss+xml">
+    {t(lang, 'blog.rss')}
+  </a>
+</section>
+
+{
+  posts.length === 0 ? (
+    <p class="empty">{t(lang, 'blog.empty')}</p>
+  ) : (
+    <ul class="grid">
+      {posts.map((post) => (
+        <li>
+          <BlogCard post={post} lang={lang} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+<style>
+  .blog-head {
+    padding-block: 2rem 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 1rem;
+  }
+  .blog-head h1 {
+    font-size: clamp(2rem, 5vw, 3rem);
+    margin: 0;
+    letter-spacing: -0.02em;
+    width: 100%;
+  }
+  .lead {
+    color: var(--color-muted);
+    margin: 0;
+    flex: 1;
+  }
+  .rss {
+    font-size: 0.85rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    color: var(--color-muted);
+  }
+  .rss:hover {
+    color: var(--color-text);
+    border-color: var(--color-accent);
+    text-decoration: none;
+  }
+  .grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  }
+  .empty {
+    color: var(--color-muted);
+    padding-block: 2rem;
+  }
+</style>

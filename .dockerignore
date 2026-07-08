@@ -1,0 +1,11 @@
+node_modules
+dist
+.astro
+.git
+.gitignore
+.env
+.env.*
+PLAN
+README.md
+*.log
+.DS_Store
