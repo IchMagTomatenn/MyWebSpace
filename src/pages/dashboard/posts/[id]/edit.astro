@@ -1,0 +1,77 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import PostEditor from '../../../../components/PostEditor.astro';
+import { getLangFromUrl, t } from '../../../../i18n/utils';
+import { defaultLang, type Lang } from '../../../../i18n/ui';
+import { db } from '../../../../db';
+import { blogPosts, blogPostTranslations } from '../../../../db/schema';
+import { and, eq } from 'drizzle-orm';
+import type { TranslationRow } from '../../../../lib/posts';
+
+const lang: Lang = getLangFromUrl(Astro.url) ?? defaultLang;
+const l = (path: string) => (lang === defaultLang ? path : `/${lang}${path}`);
+
+const me = Astro.locals.user;
+if (!me) {
+  return Astro.redirect(l('/login'));
+}
+
+const id = Astro.params.id;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const validId = typeof id === 'string' && UUID_RE.test(id);
+
+// Load the post (owner-scoped) + its translations. A miss — whether the post
+// doesn't exist or belongs to another user — renders a 404.
+let post: typeof blogPosts.$inferSelect | null = null;
+let translations: TranslationRow[] = [];
+if (validId) {
+  try {
+    const [row] = await db
+      .select()
+      .from(blogPosts)
+      .where(and(eq(blogPosts.id, id!), eq(blogPosts.userId, me.id)))
+      .limit(1);
+    if (row) {
+      post = row;
+      const trRows = await db
+        .select({
+          lang: blogPostTranslations.lang,
+          title: blogPostTranslations.title,
+          excerpt: blogPostTranslations.excerpt,
+          content: blogPostTranslations.content,
+        })
+        .from(blogPostTranslations)
+        .where(eq(blogPostTranslations.blogPostId, id!));
+      translations = trRows as TranslationRow[];
+    }
+  } catch (err) {
+    console.error('[dashboard/posts/edit] load failed:', err);
+  }
+}
+
+const found = post != null;
+if (!found) {
+  Astro.response.status = 404;
+}
+---
+
+<BaseLayout title={found ? t(lang, 'posts.editor.edit_title') : t(lang, 'posts.error.not_found')}>
+  {found && post ? (
+    <PostEditor
+      mode="edit"
+      postId={post.id}
+      slug={post.slug}
+      coverUrl={post.coverUrl}
+      published={post.published}
+      translations={translations}
+    />
+  ) : (
+    <section style="padding-block: 3rem; text-align: center;">
+      <h1>{t(lang, 'posts.error.not_found')}</h1>
+      <p style="color: var(--color-muted);">{t(lang, 'posts.back')}</p>
+      <p style="margin-top: 1.5rem;">
+        <a class="btn btn-ghost" href={l('/dashboard/posts')}>{t(lang, 'posts.back')}</a>
+      </p>
+    </section>
+  )}
+</BaseLayout>

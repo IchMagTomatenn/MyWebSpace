@@ -1,0 +1,230 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getLangFromUrl, t } from '../../i18n/utils';
+import { defaultLang, type Lang } from '../../i18n/ui';
+import { db } from '../../db';
+import { user } from '../../db/schema';
+import { eq } from 'drizzle-orm';
+
+const lang: Lang = getLangFromUrl(Astro.url) ?? defaultLang;
+const l = (path: string) => (lang === defaultLang ? path : `/${lang}${path}`);
+
+const me = Astro.locals.user;
+if (!me) {
+  return Astro.redirect(l('/login'));
+}
+
+// The session only carries a subset of fields (no `bio`), so we load the
+// full row from the DB to prefill the form. Falls back to the session values
+// when the database is unreachable (e.g. not configured yet).
+let row: typeof user.$inferSelect | null = null;
+try {
+  const [r] = await db.select().from(user).where(eq(user.id, me.id)).limit(1);
+  row = r ?? null;
+} catch (err) {
+  console.error('[profile] could not load user row:', err);
+}
+
+const nameVal = row?.name ?? me.name;
+const usernameVal = row?.username ?? me.username ?? '';
+const bioVal = row?.bio ?? '';
+const avatarVal = row?.image ?? me.avatarUrl ?? '';
+
+const saved = Astro.url.searchParams.get('saved') === '1';
+---
+
+<BaseLayout title={t(lang, 'dashboard.profile.title')}>
+  <section style="padding-block: 2rem; max-width: 42rem;">
+    <h1>{t(lang, 'dashboard.profile.title')}</h1>
+    <p class="subtitle">{t(lang, 'dashboard.profile.subtitle')}</p>
+
+    {saved && <p class="form-msg success">{t(lang, 'dashboard.profile_saved')}</p>}
+
+    <form id="profile-form" class="card" novalidate>
+      <!-- Avatar -->
+      <div class="field avatar-field">
+        <label>{t(lang, 'dashboard.profile.avatar')}</label>
+        <div class="avatar-row">
+          <div class="avatar-preview" id="avatar-preview">
+            {avatarVal ? (
+              <img id="avatar-img" src={avatarVal} alt="" width="72" height="72" />
+            ) : (
+              <span id="avatar-fallback" class="avatar-fallback">
+                {nameVal.slice(0, 1).toUpperCase()}
+              </span>
+            )}
+          </div>
+          <label class="avatar-upload btn btn-ghost">
+            <span>{t(lang, 'dashboard.profile.avatar.change')}</span>
+            <input id="avatar-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+          </label>
+          <input id="avatar-url" type="hidden" value={avatarVal} />
+          <p id="avatar-msg" class="form-msg error" hidden></p>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="name">{t(lang, 'dashboard.profile.name')}</label>
+        <input id="name" name="name" type="text" autocomplete="name" value={nameVal} required />
+      </div>
+
+      <div class="field">
+        <label for="username">{t(lang, 'dashboard.profile.username')}</label>
+        <input id="username" name="username" type="text" autocomplete="username"
+          value={usernameVal} pattern="^[a-z0-9_-]{3,20}$" />
+        <p class="hint">{t(lang, 'dashboard.profile.username.hint')}</p>
+      </div>
+
+      <div class="field">
+        <label for="bio">{t(lang, 'dashboard.profile.bio')}</label>
+        <textarea id="bio" name="bio" rows="4" maxlength="500"
+          placeholder={t(lang, 'dashboard.profile.bio.placeholder')}>{bioVal}</textarea>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">{t(lang, 'dashboard.profile.save')}</button>
+        <p class="form-meta"><a href={l('/dashboard')}>{t(lang, 'dashboard.profile.back')}</a></p>
+      </div>
+      <p id="msg" class="form-msg error" hidden></p>
+    </form>
+  </section>
+
+  <span id="i18n"
+    class="visually-hidden"
+    data-generic={t(lang, 'auth.error.generic')}
+    data-required={t(lang, 'auth.error.required')}
+    data-username-taken={t(lang, 'dashboard.profile.username_taken')}
+    data-username-invalid={t(lang, 'dashboard.profile.username_invalid')}
+    data-size={t(lang, 'upload.error.size')}
+    data-type={t(lang, 'upload.error.type')}
+    data-no-file={t(lang, 'upload.error.no_file')}
+    data-upload-failed={t(lang, 'upload.error.failed')}
+    data-back={l('/dashboard')}
+  ></span>
+
+  <script>
+    const i18n = document.getElementById('i18n')!.dataset as Record<string, string>;
+
+    const form = document.getElementById('profile-form')! as HTMLFormElement;
+    const msg = document.getElementById('msg')!;
+    const fileInput = document.getElementById('avatar-file')! as HTMLInputElement;
+    const avatarUrlInput = document.getElementById('avatar-url')! as HTMLInputElement;
+    const avatarPreview = document.getElementById('avatar-preview')!;
+    const avatarMsg = document.getElementById('avatar-msg')!;
+
+    // ---- Avatar upload ----
+    fileInput.addEventListener('change', async () => {
+      avatarMsg.hidden = true;
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: fd });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.url) {
+          const key =
+            res.status === 413 ? 'size' :
+            res.status === 415 ? 'type' :
+            res.status === 401 ? 'no_file' :
+            'upload-failed';
+          avatarMsg.textContent = i18n[key] ?? i18n['upload-failed'];
+          avatarMsg.hidden = false;
+          return;
+        }
+        avatarUrlInput.value = data.url;
+        // Replace preview with the uploaded image.
+        avatarPreview.innerHTML = `<img src="${data.url}" alt="" width="72" height="72" />`;
+      } catch (e) {
+        avatarMsg.textContent = i18n['upload-failed'];
+        avatarMsg.hidden = false;
+      } finally {
+        fileInput.value = '';
+      }
+    });
+
+    // ---- Profile save ----
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.hidden = true;
+      const fd = new FormData(form);
+      const name = String(fd.get('name') ?? '').trim();
+      if (!name) {
+        msg.textContent = i18n.required;
+        msg.hidden = false;
+        return;
+      }
+      const username = String(fd.get('username') ?? '').trim().toLowerCase();
+      const bio = String(fd.get('bio') ?? '');
+      const avatarUrl = avatarUrlInput.value;
+      try {
+        const res = await fetch('/api/profile', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ name, username, bio, avatarUrl }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const key =
+            data.error === 'username_taken' ? 'username-taken' :
+            data.error === 'username_invalid' ? 'username-invalid' :
+            data.error === 'required' ? 'required' :
+            'generic';
+          msg.textContent = i18n[key] ?? i18n.generic;
+          msg.hidden = false;
+          return;
+        }
+        window.location.href = i18n.back;
+      } catch (err) {
+        msg.textContent = i18n.generic;
+        msg.hidden = false;
+      }
+    });
+  </script>
+</BaseLayout>
+
+<style>
+  .avatar-field {
+    margin-bottom: 1.25rem;
+  }
+  .avatar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .avatar-preview {
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 999px;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    flex-shrink: 0;
+  }
+  .avatar-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .avatar-fallback {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--color-muted);
+  }
+  .avatar-upload {
+    cursor: pointer;
+    display: inline-block;
+  }
+  .hint {
+    color: var(--color-muted);
+    font-size: 0.8rem;
+    margin: 0.25rem 0 0;
+  }
+  .field {
+    margin-bottom: 1rem;
+  }
+</style>

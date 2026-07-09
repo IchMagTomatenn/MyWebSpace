@@ -1,0 +1,42 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getLangFromUrl, t } from '../i18n/utils';
+import { defaultLang, type Lang } from '../i18n/ui';
+
+const lang: Lang = getLangFromUrl(Astro.url) ?? defaultLang;
+// Placeholder until Step 12 wires real DB queries (latest posts feed + tag filter).
+const posts: { slug: string; title: string }[] = [];
+---
+
+<BaseLayout title={t(lang, 'nav.posts')}>
+  <section style="padding-block: 2rem;">
+    <h1>{t(lang, 'nav.posts')}</h1>
+    {
+      posts.length === 0 ? (
+        <p style="color: var(--color-muted);">{t(lang, 'home.empty')}</p>
+      ) : (
+        <ul class="post-list">
+          {posts.map((post) => (
+            <li><a href={`/posts/${post.slug}`}>{post.title}</a></li>
+          ))}
+        </ul>
+      )
+    }
+  </section>
+</BaseLayout>
+
+<style>
+  .post-list {
+    list-style: none;
+    margin: 1rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+  .post-list li {
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+  }
+</style>

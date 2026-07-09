@@ -1,0 +1,45 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getLangFromUrl, t } from '../i18n/utils';
+import { defaultLang, type Lang } from '../i18n/ui';
+
+const lang: Lang = getLangFromUrl(Astro.url) ?? defaultLang;
+const homeHref = lang === defaultLang ? '/' : `/${lang}`;
+---
+
+<BaseLayout title={t(lang, 'error.404.title')}>
+  <section class="notfound">
+    <h1>{t(lang, 'error.404.title')}</h1>
+    <p>{t(lang, 'error.404.body')}</p>
+    <a class="btn btn-primary" href={homeHref}>{t(lang, 'error.404.cta')}</a>
+  </section>
+</BaseLayout>
+
+<style>
+  .notfound {
+    padding-block: clamp(3rem, 10vw, 6rem);
+    text-align: center;
+  }
+  .notfound h1 {
+    font-size: clamp(2rem, 5vw, 3rem);
+    margin: 0 0 1rem;
+  }
+  .notfound p {
+    color: var(--color-muted);
+    max-width: 32rem;
+    margin-inline: auto;
+  }
+  .btn {
+    display: inline-block;
+    margin-top: 1.5rem;
+    padding: 0.65rem 1.2rem;
+    border-radius: var(--radius);
+    font-weight: 600;
+    background: var(--color-accent);
+    color: var(--color-accent-contrast);
+  }
+  .btn:hover {
+    text-decoration: none;
+    opacity: 0.9;
+  }
+</style>

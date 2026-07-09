@@ -1,0 +1,215 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { getLangFromUrl, t } from '../../../i18n/utils';
+import { defaultLang, type Lang } from '../../../i18n/ui';
+import { db } from '../../../db';
+import { blogPosts } from '../../../db/schema';
+import { eq } from 'drizzle-orm';
+
+const lang: Lang = getLangFromUrl(Astro.url) ?? defaultLang;
+const l = (path: string) => (lang === defaultLang ? path : `/${lang}${path}`);
+
+const me = Astro.locals.user;
+if (!me) {
+  return Astro.redirect(l('/login'));
+}
+
+// Load the user's own posts (drafts + published) with translations, newest
+// first. Falls back to an empty list when the DB is unreachable so the page
+// still renders.
+let posts: Array<{
+  id: string;
+  slug: string;
+  published: boolean;
+  views: number;
+  createdAt: Date;
+  updatedAt: Date;
+  title: string;
+}> = [];
+try {
+  const rows = await db.query.blogPosts.findMany({
+    where: eq(blogPosts.userId, me.id),
+    with: { translations: true },
+  });
+  // Sort newest first, then pick the title for the current language (fallback
+  // to the first available translation, then the slug).
+  posts = rows
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .map((p) => {
+      const tr =
+        p.translations.find((x) => x.lang === lang) ?? p.translations[0];
+      return {
+        id: p.id,
+        slug: p.slug,
+        published: p.published,
+        views: p.views,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+        title: tr?.title ?? p.slug,
+      };
+    });
+} catch (err) {
+  console.error('[dashboard/posts] list query failed:', err);
+}
+
+const fmtDate = (d: Date) =>
+  new Date(d).toLocaleDateString(lang === 'en' ? 'en-US' : 'de-DE', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+---
+
+<BaseLayout title={t(lang, 'posts.my')}>
+  <section style="padding-block: 2rem;">
+    <header class="page-head">
+      <div>
+        <h1>{t(lang, 'posts.my')}</h1>
+        <p class="subtitle">{t(lang, 'posts.my.subtitle')}</p>
+      </div>
+      <a class="btn btn-primary" href={l('/dashboard/posts/new')}>{t(lang, 'posts.new')}</a>
+    </header>
+
+    {posts.length === 0 ? (
+      <p class="empty">{t(lang, 'posts.empty')}</p>
+    ) : (
+      <ul class="post-list" id="post-list">
+        {posts.map((p) => (
+          <li class="post-row" data-id={p.id}>
+            <div class="row-main">
+              <a class="row-title" href={l(`/dashboard/posts/${p.id}/edit`)}>{p.title}</a>
+              <div class="row-meta">
+                <span class={'badge ' + (p.published ? 'badge-pub' : 'badge-draft')}>
+                  {p.published ? t(lang, 'posts.status.published') : t(lang, 'posts.status.draft')}
+                </span>
+                <span class="sep">·</span>
+                <span>{t(lang, 'posts.created')} {fmtDate(p.createdAt)}</span>
+                <span class="sep">·</span>
+                <span class="slug">/{p.slug}</span>
+              </div>
+            </div>
+            <div class="row-actions">
+              <a class="btn btn-ghost btn-sm" href={l(`/dashboard/posts/${p.id}/edit`)}>{t(lang, 'posts.edit')}</a>
+              <button class="btn btn-ghost btn-sm del" type="button" data-id={p.id}>{t(lang, 'posts.delete')}</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    )}
+
+    <p class="back"><a href={l('/dashboard')}>← {t(lang, 'dashboard.title')}</a></p>
+  </section>
+
+  <span id="i18n" class="visually-hidden"
+    data-confirm={t(lang, 'posts.confirm_delete')}
+    data-not-found={t(lang, 'posts.error.not_found')}
+    data-failed={t(lang, 'posts.error.failed')}
+  ></span>
+
+  <script>
+    const i18n = document.getElementById('i18n')!.dataset as Record<string, string>;
+    const list = document.getElementById('post-list')!;
+
+    list.addEventListener('click', async (e) => {
+      const btn = (e.target as HTMLElement).closest('.del') as HTMLButtonElement | null;
+      if (!btn) return;
+      const id = btn.dataset.id;
+      if (!id) return;
+      if (!confirm(i18n.confirm ?? '')) return;
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/api/posts/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          btn.closest('.post-row')?.remove();
+          // If the list is now empty, show the empty message.
+          if (!list.querySelector('.post-row')) {
+            list.outerHTML = `<p class="empty"></p>`;
+          }
+        } else if (res.status === 404) {
+          alert(i18n['not-found'] ?? '');
+          btn.closest('.post-row')?.remove();
+        } else {
+          alert(i18n.failed ?? '');
+          btn.disabled = false;
+        }
+      } catch (err) {
+        alert(i18n.failed ?? '');
+        btn.disabled = false;
+      }
+    });
+  </script>
+</BaseLayout>
+
+<style>
+  .page-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+  }
+  .page-head h1 { margin: 0; }
+  .subtitle { color: var(--color-muted); margin: 0.25rem 0 0; }
+  .empty { color: var(--color-muted); }
+  .post-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+  .post-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    flex-wrap: wrap;
+  }
+  .row-main { min-width: 0; flex: 1 1 20rem; }
+  .row-title {
+    color: var(--color-text);
+    font-weight: 600;
+    font-size: 1.05rem;
+  }
+  .row-title:hover { color: var(--color-accent); text-decoration: none; }
+  .row-meta {
+    margin-top: 0.25rem;
+    font-size: 0.82rem;
+    color: var(--color-muted);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .sep { opacity: 0.5; }
+  .slug { font-family: var(--font-mono); font-size: 0.8rem; }
+  .badge {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-draft { color: var(--color-muted); }
+  .badge-pub {
+    color: #15803d;
+    border-color: color-mix(in srgb, #15803d 40%, transparent);
+    background: color-mix(in srgb, #15803d 10%, transparent);
+  }
+  :root.dark .badge-pub {
+    color: #86efac;
+    border-color: color-mix(in srgb, #86efac 40%, transparent);
+  }
+  .row-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+  .btn-sm { padding: 0.4rem 0.7rem; font-size: 0.85rem; }
+  .back { margin-top: 2rem; }
+  .back a { color: var(--color-muted); }
+  .back a:hover { color: var(--color-accent); }
+</style>

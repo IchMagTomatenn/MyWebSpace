@@ -1,0 +1,200 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getLangFromUrl, t } from '../../i18n/utils';
+import { defaultLang, type Lang } from '../../i18n/ui';
+import { db } from '../../db';
+import { user } from '../../db/schema';
+import { eq } from 'drizzle-orm';
+
+const lang: Lang = getLangFromUrl(Astro.url) ?? defaultLang;
+const l = (path: string) => (lang === defaultLang ? path : `/${lang}${path}`);
+
+// Usernames are stored lowercase (validated on save), so the lookup is exact.
+const usernameParam = (Astro.params.username ?? '').toLowerCase();
+
+// Wrapped in an IIFE so TypeScript infers the full row type *including* the
+// `with` relations (projects / blogPosts and their translations) without us
+// having to spell them out by hand. Returns null on a miss or DB error.
+const found = await (async () => {
+  try {
+    return (
+      (await db.query.user.findFirst({
+        where: eq(user.username, usernameParam),
+        with: {
+          projects: { with: { translations: true } },
+          blogPosts: { with: { translations: true } },
+        },
+      })) ?? null
+    );
+  } catch (err) {
+    console.error('[u] profile query failed:', err);
+    return null;
+  }
+})();
+
+if (!found) {
+  Astro.response.status = 404;
+}
+
+// Pick the translation matching the current language, falling back to any.
+const tr = <T extends { lang: string }>(list: T[] | undefined, target: string) =>
+  (list ?? []).find((x) => x.lang === target) ?? (list ?? [])[0];
+
+const projects = (found?.projects ?? []).map((p) => ({
+  slug: p.slug,
+  title: tr(p.translations, lang)?.title ?? p.slug,
+}));
+const posts = (found?.blogPosts ?? [])
+  .filter((p) => p.published)
+  .map((p) => ({
+    slug: p.slug,
+    title: tr(p.translations, lang)?.title ?? p.slug,
+    excerpt: tr(p.translations, lang)?.excerpt ?? '',
+    createdAt: p.createdAt,
+  }))
+  .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+const title = found ? t(lang, 'profile.title').replace('{name}', found.name) : t(lang, 'profile.not_found.title');
+const joined = found ? new Date(found.createdAt).toLocaleDateString(lang === 'en' ? 'en-US' : 'de-DE', { year: 'numeric', month: 'long' }) : '';
+---
+
+<BaseLayout title={title}>
+  {found ? (
+    <section class="profile" style="padding-block: 2rem;">
+      <header class="profile-head">
+        <div class="avatar-lg">
+          {found.image ? (
+            <img src={found.image} alt="" width="96" height="96" />
+          ) : (
+            <span class="avatar-fallback">{found.name.slice(0, 1).toUpperCase()}</span>
+          )}
+        </div>
+        <div class="head-meta">
+          <h1>{found.name}</h1>
+          <p class="handle">@{found.username}</p>
+          {found.bio ? <p class="bio">{found.bio}</p> : <p class="bio empty">{t(lang, 'profile.no_bio')}</p>}
+          <p class="joined">{t(lang, 'profile.joined')} {joined}</p>
+        </div>
+      </header>
+
+      <div class="lists">
+        <section class="list">
+          <h2>{t(lang, 'profile.projects')}</h2>
+          {projects.length === 0 ? (
+            <p class="empty">{t(lang, 'profile.no_projects')}</p>
+          ) : (
+            <ul>
+              {projects.map((p) => (
+                <li><a href={l(`/projects/${p.slug}`)}>{p.title}</a></li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section class="list">
+          <h2>{t(lang, 'profile.posts')}</h2>
+          {posts.length === 0 ? (
+            <p class="empty">{t(lang, 'profile.no_posts')}</p>
+          ) : (
+            <ul>
+              {posts.map((p) => (
+                <li><a href={l(`/posts/${p.slug}`)}>{p.title}</a></li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    </section>
+  ) : (
+    <section style="padding-block: 3rem; text-align: center;">
+      <h1>{t(lang, 'profile.not_found.title')}</h1>
+      <p style="color: var(--color-muted);">{t(lang, 'profile.not_found.body')}</p>
+      <p style="margin-top: 1.5rem;"><a class="btn btn-ghost" href={l('/')}>{t(lang, 'error.404.cta')}</a></p>
+    </section>
+  )}
+</BaseLayout>
+
+<style>
+  .profile-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+  }
+  .avatar-lg {
+    width: 6rem;
+    height: 6rem;
+    border-radius: 999px;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    flex-shrink: 0;
+  }
+  .avatar-lg img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .avatar-fallback {
+    font-size: 2.25rem;
+    font-weight: 600;
+    color: var(--color-muted);
+  }
+  .head-meta h1 {
+    margin: 0;
+  }
+  .handle {
+    color: var(--color-muted);
+    margin: 0.15rem 0 0.5rem;
+  }
+  .bio {
+    max-width: 40rem;
+    line-height: 1.5;
+    margin: 0 0 0.5rem;
+  }
+  .bio.empty {
+    color: var(--color-muted);
+  }
+  .joined {
+    color: var(--color-muted);
+    font-size: 0.85rem;
+    margin: 0;
+  }
+  .lists {
+    margin-top: 2.5rem;
+    display: grid;
+    gap: 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  }
+  .list h2 {
+    font-size: 1.2rem;
+    margin: 0 0 0.75rem;
+  }
+  .list ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.6rem;
+  }
+  .list li {
+    padding: 0.6rem 0.9rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+  }
+  .list a {
+    color: var(--color-text);
+    font-weight: 600;
+  }
+  .list a:hover {
+    color: var(--color-accent);
+    text-decoration: none;
+  }
+  .empty {
+    color: var(--color-muted);
+  }
+</style>

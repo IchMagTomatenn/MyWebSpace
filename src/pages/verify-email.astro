@@ -1,0 +1,64 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getLangFromUrl, t } from '../i18n/utils';
+import { defaultLang, type Lang } from '../i18n/ui';
+
+const lang: Lang = getLangFromUrl(Astro.url) ?? defaultLang;
+const l = (path: string) => (lang === defaultLang ? path : `/${lang}${path}`);
+---
+
+<BaseLayout title={t(lang, 'auth.verify_email.title')}>
+  <section style="padding-block: clamp(2rem, 6vw, 4rem);">
+    <div class="card">
+      <h1>{t(lang, 'auth.verify_email.title')}</h1>
+      <p class="subtitle">{t(lang, 'auth.verify_email.body')}</p>
+
+      <form id="resend-form" novalidate>
+        <div class="field">
+          <label for="email">{t(lang, 'auth.email')}</label>
+          <input id="email" name="email" type="email" autocomplete="email" required />
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-ghost" type="submit">{t(lang, 'auth.verify_email.resend')}</button>
+        </div>
+        <p id="msg" class="form-msg" hidden></p>
+      </form>
+
+      <p class="auth-alt form-meta">
+        <a href={l('/login')}>{t(lang, 'nav.login')}</a>
+      </p>
+    </div>
+  </section>
+
+  <span id="i18n" class="visually-hidden" data-generic={t(lang, 'auth.error.generic')} data-resent={t(lang, 'auth.verify_email.resent')}></span>
+
+  <script>
+    import { authClient } from '../lib/auth-client';
+    const i18n = document.getElementById('i18n')!.dataset as Record<string, string>;
+    const form = document.getElementById('resend-form')! as HTMLFormElement;
+    const msg = document.getElementById('msg')!;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.hidden = true;
+      const email = String(new FormData(form).get('email') ?? '').trim();
+      if (!email) return;
+      try {
+        const origin = window.location.origin;
+        const res = await authClient.sendVerificationEmail({
+          email,
+          callbackURL: `${origin}/login?verified=1`,
+        });
+        msg.textContent = res.error ? (res.error.message ?? i18n.generic) : i18n.resent;
+        msg.classList.toggle('error', !!res.error);
+        msg.classList.toggle('success', !res.error);
+        msg.hidden = false;
+      } catch (err) {
+        msg.textContent = i18n.generic;
+        msg.classList.add('error');
+        msg.classList.remove('success');
+        msg.hidden = false;
+      }
+    });
+  </script>
+</BaseLayout>

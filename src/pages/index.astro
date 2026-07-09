@@ -1,8 +1,698 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import HomeView from '../components/HomeView.astro';
+import Scene3D from '../components/Scene3D.astro';
+import { getLangFromUrl, t } from '../i18n/utils';
+import { defaultLang, type Lang } from '../i18n/ui';
+
+const lang: Lang = getLangFromUrl(Astro.url) ?? defaultLang;
+const l = (path: string) => (lang === defaultLang ? path : `/${lang}${path}`);
+
+// Wired to the database in Schritt 13. For now the portal home renders
+// empty-state placeholders so the build works end-to-end.
+const latestPosts: { slug: string; title: string; author: string }[] = [];
+const trendingPosts: { slug: string; title: string; author: string }[] = [];
+
+const features = [
+  {
+    icon: '🚀',
+    titleKey: 'home.feature.projects.title',
+    descKey: 'home.feature.projects.desc',
+    href: l('/projects'),
+    delay: 1,
+  },
+  {
+    icon: '✍️',
+    titleKey: 'home.feature.blog.title',
+    descKey: 'home.feature.blog.desc',
+    href: l('/posts'),
+    delay: 2,
+  },
+  {
+    icon: '🌐',
+    titleKey: 'home.feature.i18n.title',
+    descKey: 'home.feature.i18n.desc',
+    href: l('/posts'),
+    delay: 3,
+  },
+  {
+    icon: '👤',
+    titleKey: 'home.feature.profile.title',
+    descKey: 'home.feature.profile.desc',
+    href: l('/register'),
+    delay: 4,
+  },
+] as const;
+
+// Stats — wired to live DB counts in Schritt 13. Placeholders for now.
+const stats = [
+  { value: 0, labelKey: 'home.stats.developers' },
+  { value: 0, labelKey: 'home.stats.posts' },
+  { value: 0, labelKey: 'home.stats.projects' },
+  { value: 0, labelKey: 'home.stats.tags' },
+] as const;
+
+const steps = [
+  { titleKey: 'home.how.step1.title', descKey: 'home.how.step1.desc' },
+  { titleKey: 'home.how.step2.title', descKey: 'home.how.step2.desc' },
+  { titleKey: 'home.how.step3.title', descKey: 'home.how.step3.desc' },
+] as const;
+
+const showcaseFeatures = [
+  'home.showcase.feature.multi_lang',
+  'home.showcase.feature.markdown',
+  'home.showcase.feature.drafts',
+  'home.showcase.feature.cover',
+  'home.showcase.feature.tags',
+] as const;
+
+const faqs = [
+  { q: 'home.faq.q1', a: 'home.faq.a1' },
+  { q: 'home.faq.q2', a: 'home.faq.a2' },
+  { q: 'home.faq.q3', a: 'home.faq.a3' },
+  { q: 'home.faq.q4', a: 'home.faq.a4' },
+  { q: 'home.faq.q5', a: 'home.faq.a5' },
+] as const;
 ---
 
-<BaseLayout>
-  <HomeView />
+<BaseLayout title={t(lang, 'site.title')} description={t(lang, 'portal.tagline')}>
+  <div class="cursor-glow" id="cursor-glow" aria-hidden="true"></div>
+
+  <!-- ============================ HERO ============================ -->
+  <section class="hero">
+    <div class="hero-bg" aria-hidden="true">
+      <Scene3D />
+      <span class="blob blob-1"></span>
+      <span class="blob blob-2"></span>
+      <span class="blob blob-3"></span>
+    </div>
+    <div class="hero-scrim" aria-hidden="true"></div>
+
+    <div class="hero-content">
+      <p class="eyebrow glass reveal">{t(lang, 'home.hero.eyebrow')}</p>
+      <h1 class="hero-title text-gradient reveal" data-delay="1">{t(lang, 'site.title')}</h1>
+      <p class="lead reveal" data-delay="2">{t(lang, 'portal.tagline')}</p>
+      <div class="cta reveal" data-delay="3">
+        <a class="btn btn-primary btn-magnetic" href={l('/register')} data-magnetic>
+          {t(lang, 'portal.cta.register')}
+        </a>
+        <a class="btn btn-ghost btn-magnetic" href={l('/posts')} data-magnetic>
+          {t(lang, 'portal.cta.explore')}
+        </a>
+      </div>
+    </div>
+
+    <a class="scroll-indicator" href="#features" aria-label={t(lang, 'home.features.title')}>
+      <span>{t(lang, 'home.features.title')}</span>
+      <span class="chev"></span>
+    </a>
+  </section>
+
+  <!-- ============================ STATS ============================ -->
+  <section class="stats-section">
+    <header class="section-head center reveal">
+      <h2>{t(lang, 'home.stats.title')}</h2>
+      <p>{t(lang, 'home.stats.subtitle')}</p>
+    </header>
+    <div class="stats">
+      {
+        stats.map((s, i) => (
+          <div class="stat reveal" data-delay={String((i % 5) + 1)} data-count={s.value}>
+            <span class="stat-num" data-count={s.value}>0</span>
+            <span class="stat-label">{t(lang, s.labelKey)}</span>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <!-- ============================ FEATURES ============================ -->
+  <section id="features" class="features">
+    <header class="section-head reveal">
+      <h2>{t(lang, 'home.features.title')}</h2>
+      <p>{t(lang, 'home.features.subtitle')}</p>
+    </header>
+    <div class="feature-grid">
+      {
+        features.map((f) => (
+          <a class="feature-card tilt-card reveal" href={f.href} data-delay={f.delay} data-tilt>
+            <span class="feature-icon" aria-hidden="true">
+              {f.icon}
+            </span>
+            <div class="tilt-inner">
+              <h3>{t(lang, f.titleKey)}</h3>
+              <p>{t(lang, f.descKey)}</p>
+            </div>
+            <span class="tilt-glow" aria-hidden="true" />
+          </a>
+        ))
+      }
+    </div>
+  </section>
+
+  <!-- ============================ HOW IT WORKS ============================ -->
+  <section class="how">
+    <header class="section-head center reveal">
+      <h2>{t(lang, 'home.how.title')}</h2>
+      <p>{t(lang, 'home.how.subtitle')}</p>
+    </header>
+    <div class="how-grid">
+      {
+        steps.map((s, i) => (
+          <div class="how-step reveal" data-delay={String((i % 5) + 1)}>
+            <h3>{t(lang, s.titleKey)}</h3>
+            <p>{t(lang, s.descKey)}</p>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <!-- ============================ SHOWCASE ============================ -->
+  <section class="showcase">
+    <header class="section-head center reveal">
+      <h2>{t(lang, 'home.showcase.title')}</h2>
+      <p>{t(lang, 'home.showcase.subtitle')}</p>
+    </header>
+    <div class="showcase-grid">
+      <div class="showcase-card reveal" data-tilt>
+        <span class="showcase-badge">{t(lang, 'home.showcase.badge.demo')}</span>
+        <div class="showcase-head">
+          <div class="showcase-avatar" aria-hidden="true">M</div>
+          <div>
+            <h3 class="showcase-name">Max Mustermann</h3>
+            <p class="showcase-handle">@max</p>
+          </div>
+        </div>
+        <p class="showcase-bio">{t(lang, 'home.showcase.profile.bio')}</p>
+        <div class="showcase-stats">
+          <div class="showcase-stat">
+            <b>12</b>
+            <span>{t(lang, 'home.showcase.profile.posts')}</span>
+          </div>
+          <div class="showcase-stat">
+            <b>5</b>
+            <span>{t(lang, 'home.showcase.profile.projects')}</span>
+          </div>
+          <div class="showcase-stat">
+            <b>2025</b>
+            <span>{t(lang, 'home.showcase.profile.joined')}</span>
+          </div>
+        </div>
+        <span class="tilt-glow" aria-hidden="true" />
+      </div>
+      <div class="showcase-features">
+        {
+          showcaseFeatures.map((f, i) => (
+            <div class="showcase-feature reveal" data-delay={String((i % 5) + 1)}>
+              <span class="tick" aria-hidden="true">✓</span>
+              {t(lang, f)}
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ LATEST POSTS ============================ -->
+  <section class="feed">
+    <header class="section-head reveal">
+      <h2>{t(lang, 'home.latest')}</h2>
+    </header>
+    {
+      latestPosts.length === 0 ? (
+        <p class="empty reveal">{t(lang, 'home.empty')}</p>
+      ) : (
+        <ul class="post-list">
+          {latestPosts.map((post, i) => (
+            <li class="reveal" data-delay={String((i % 5) + 1)}>
+              <a href={l(`/posts/${post.slug}`)}>{post.title}</a>
+              <span class="meta">
+                {t(lang, 'common.by')} {post.author}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </section>
+
+  <!-- ============================ TRENDING ============================ -->
+  <section class="feed">
+    <header class="section-head reveal">
+      <h2>{t(lang, 'home.trending')}</h2>
+    </header>
+    {
+      trendingPosts.length === 0 ? (
+        <p class="empty reveal">{t(lang, 'home.empty')}</p>
+      ) : (
+        <ul class="post-list">
+          {trendingPosts.map((post, i) => (
+            <li class="reveal" data-delay={String((i % 5) + 1)}>
+              <a href={l(`/posts/${post.slug}`)}>{post.title}</a>
+              <span class="meta">
+                {t(lang, 'common.by')} {post.author}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </section>
+
+  <!-- ============================ FAQ ============================ -->
+  <section class="faq">
+    <header class="section-head center reveal">
+      <h2>{t(lang, 'home.faq.title')}</h2>
+      <p>{t(lang, 'home.faq.subtitle')}</p>
+    </header>
+    <div class="faq-list">
+      {
+        faqs.map((f, i) => (
+          <div class="faq-item reveal" data-delay={String((i % 5) + 1)}>
+            <button class="faq-q" type="button" aria-expanded="false">
+              <span>{t(lang, f.q)}</span>
+              <span class="faq-icon" aria-hidden="true"></span>
+            </button>
+            <div class="faq-a">
+              <div class="faq-a-inner">{t(lang, f.a)}</div>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <!-- ============================ CTA BAND ============================ -->
+  <section class="cta-band glass reveal">
+    <span class="grain" aria-hidden="true"></span>
+    <div class="cta-inner">
+      <h2 class="text-gradient">{t(lang, 'home.cta.title')}</h2>
+      <p>{t(lang, 'home.cta.body')}</p>
+      <a class="btn btn-primary btn-magnetic" href={l('/register')} data-magnetic>
+        {t(lang, 'home.cta.button')}
+      </a>
+    </div>
+  </section>
+
+  <script>
+    // ---- Custom cursor glow (soft trailing light) -----------------
+    const glow = document.getElementById('cursor-glow');
+    if (glow && window.matchMedia('(hover: hover)').matches &&
+        !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      let gx = innerWidth / 2, gy = innerHeight / 2;
+      let mx = gx, my = gy;
+      addEventListener('pointermove', (e) => { mx = e.clientX; my = e.clientY; }, { passive: true });
+      const tick = () => {
+        gx += (mx - gx) * 0.12;
+        gy += (my - gy) * 0.12;
+        glow.style.transform = `translate(${gx}px, ${gy}px)`;
+        requestAnimationFrame(tick);
+      };
+      tick();
+    } else if (glow) {
+      glow.style.display = 'none';
+    }
+
+    // ---- Scroll reveal via IntersectionObserver --------------------
+    const reveals = document.querySelectorAll('.reveal');
+    if ('IntersectionObserver' in window && reveals.length) {
+      const io = new IntersectionObserver((entries, obs) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            // Trigger counter animation when a stat becomes visible.
+            const num = entry.target.querySelector?.('[data-count]') as HTMLElement | null;
+            if (num && !num.dataset.done) {
+              num.dataset.done = '1';
+              animateCount(num, Number(num.dataset.count ?? '0'));
+            }
+            obs.unobserve(entry.target);
+          }
+        }
+      }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+      reveals.forEach((el) => io.observe(el));
+    } else {
+      reveals.forEach((el) => {
+        el.classList.add('is-visible');
+        const num = el.querySelector?.('[data-count]') as HTMLElement | null;
+        if (num) num.textContent = String(num.dataset.count ?? '0');
+      });
+    }
+
+    // ---- Animated stat counters -----------------------------------
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function animateCount(el: HTMLElement, target: number) {
+      if (reduce || target <= 0) { el.textContent = String(target); return; }
+      const duration = 1400;
+      const start = performance.now();
+      const step = (now: number) => {
+        const p = Math.min(1, (now - start) / duration);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = String(Math.round(target * eased));
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
+
+    // ---- FAQ accordion -------------------------------------------
+    const faqItems = document.querySelectorAll<HTMLElement>('.faq-item');
+    faqItems.forEach((item) => {
+      const btn = item.querySelector<HTMLButtonElement>('.faq-q');
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        const isOpen = item.classList.contains('open');
+        faqItems.forEach((other) => {
+          other.classList.remove('open');
+          other.querySelector<HTMLButtonElement>('.faq-q')?.setAttribute('aria-expanded', 'false');
+        });
+        if (!isOpen) {
+          item.classList.add('open');
+          btn.setAttribute('aria-expanded', 'true');
+        }
+      });
+    });
+
+    // ---- 3D tilt cards --------------------------------------------
+    const tiltCards = document.querySelectorAll<HTMLElement>('[data-tilt]');
+    const supportsTilt =
+      window.matchMedia('(hover: hover)').matches &&
+      !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    tiltCards.forEach((card) => {
+      const glowEl = card.querySelector<HTMLElement>('.tilt-glow');
+      if (!supportsTilt) return;
+      let raf = 0;
+      const onMove = (e: PointerEvent) => {
+        const rect = card.getBoundingClientRect();
+        const px = (e.clientX - rect.left) / rect.width;
+        const py = (e.clientY - rect.top) / rect.height;
+        const rotY = (px - 0.5) * 12;
+        const rotX = (0.5 - py) * 12;
+        if (glowEl) {
+          glowEl.style.setProperty('--mx', `${(px * 100).toFixed(1)}%`);
+          glowEl.style.setProperty('--my', `${(py * 100).toFixed(1)}%`);
+        }
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(() => {
+          card.style.transform =
+            `perspective(900px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg) translateZ(0)`;
+        });
+      };
+      const onLeave = () => {
+        cancelAnimationFrame(raf);
+        card.style.transform = '';
+        card.classList.remove('tilting');
+      };
+      const onEnter = () => card.classList.add('tilting');
+      card.addEventListener('pointerenter', onEnter);
+      card.addEventListener('pointermove', onMove);
+      card.addEventListener('pointerleave', onLeave);
+    });
+
+    // ---- Magnetic buttons (subtle pointer pull) -------------------
+    const magnets = document.querySelectorAll<HTMLElement>('[data-magnetic]');
+    if (supportsTilt) {
+      magnets.forEach((btn) => {
+        let raf = 0;
+        btn.addEventListener('pointermove', (e) => {
+          const rect = btn.getBoundingClientRect();
+          const dx = (e.clientX - (rect.left + rect.width / 2)) * 0.25;
+          const dy = (e.clientY - (rect.top + rect.height / 2)) * 0.25;
+          cancelAnimationFrame(raf);
+          raf = requestAnimationFrame(() => {
+            btn.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`;
+          });
+        });
+        btn.addEventListener('pointerleave', () => {
+          cancelAnimationFrame(raf);
+          btn.style.transform = '';
+        });
+      });
+    }
+  </script>
 </BaseLayout>
+
+<style>
+  /* ============================ HERO ============================ */
+  .hero {
+    position: relative;
+    min-height: clamp(36rem, 88vh, 50rem);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding-block: clamp(3rem, 10vw, 6rem) 4rem;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .hero-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .hero-bg .blob {
+    position: absolute;
+  }
+  .blob-1 { top: -10%; left: -10%; }
+  .blob-2 { bottom: -15%; right: -10%; }
+  .blob-3 { top: 30%; right: 20%; }
+  .hero-content {
+    position: relative;
+    z-index: 1;
+    max-width: 44rem;
+    padding-inline: 1rem;
+  }
+  .eyebrow {
+    display: inline-block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    margin: 0 0 1.25rem;
+  }
+  .hero-title {
+    font-size: clamp(2.75rem, 8vw, 5.5rem);
+    margin: 0 0 1.25rem;
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    text-shadow: 0 8px 40px color-mix(in srgb, var(--color-accent) 18%, transparent);
+  }
+  .lead {
+    font-size: clamp(1.05rem, 2.4vw, 1.3rem);
+    color: var(--color-text);
+    opacity: 0.9;
+    max-width: 38rem;
+    margin-inline: auto;
+    line-height: 1.6;
+  }
+  .cta {
+    margin-top: 2.25rem;
+    display: flex;
+    gap: 0.9rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .scroll-indicator {
+    position: absolute;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    text-decoration: none;
+    z-index: 1;
+  }
+  .scroll-indicator:hover { color: var(--color-accent); }
+
+  /* ============================ SECTION HEADS ============================ */
+  .section-head {
+    margin-bottom: 1.75rem;
+  }
+  .section-head.center {
+    text-align: center;
+  }
+  .section-head h2 {
+    font-size: clamp(1.6rem, 3.4vw, 2.25rem);
+    margin: 0 0 0.4rem;
+    letter-spacing: -0.02em;
+  }
+  .section-head p {
+    color: var(--color-muted);
+    margin: 0;
+  }
+  .section-head.center p {
+    max-width: 38rem;
+    margin-inline: auto;
+  }
+
+  /* ============================ STATS ============================ */
+  .stats-section {
+    margin-top: 3rem;
+    padding-block: 1rem;
+  }
+
+  /* ============================ FEATURES ============================ */
+  .features {
+    margin-top: 2rem;
+    padding-block: 3rem 2rem;
+    border-top: 1px solid var(--color-border);
+  }
+  .feature-grid {
+    display: grid;
+    gap: 1.1rem;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    perspective: 1200px;
+  }
+  .feature-card {
+    padding: 1.75rem 1.5rem 1.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    color: var(--color-text);
+    transform-style: preserve-3d;
+  }
+  .feature-card:hover {
+    text-decoration: none;
+  }
+  .feature-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    font-size: 1.6rem;
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+    margin-bottom: 1rem;
+    transform: translateZ(40px);
+    box-shadow: 0 8px 22px color-mix(in srgb, var(--color-accent) 22%, transparent);
+  }
+  .feature-card h3 {
+    margin: 0 0 0.45rem;
+    font-size: 1.15rem;
+    transform: translateZ(28px);
+  }
+  .feature-card p {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.95rem;
+    line-height: 1.55;
+    transform: translateZ(18px);
+  }
+
+  /* ============================ FEED ============================ */
+  .feed {
+    margin-top: 3.5rem;
+  }
+  .post-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+  .post-list li {
+    padding: 1.1rem 1.25rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    transition: border-color var(--transition), transform var(--transition),
+      box-shadow var(--transition);
+  }
+  .post-list li:hover {
+    border-color: var(--color-accent);
+    transform: translateX(4px);
+    box-shadow: var(--shadow-sm);
+  }
+  .post-list a {
+    color: var(--color-text);
+    font-weight: 600;
+  }
+  .post-list a:hover {
+    color: var(--color-accent);
+    text-decoration: none;
+  }
+  .meta {
+    display: block;
+    color: var(--color-muted);
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+  }
+
+  /* ============================ HOW IT WORKS ============================ */
+  .how {
+    margin-top: 4rem;
+    padding-top: 2.5rem;
+    border-top: 1px solid var(--color-border);
+  }
+  .how-grid {
+    margin-top: 2.5rem;
+  }
+
+  /* ============================ SHOWCASE ============================ */
+  .showcase {
+    margin-top: 4rem;
+  }
+  .showcase-grid {
+    margin-top: 2rem;
+  }
+  .showcase-card { position: relative; }
+  .showcase-badge {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    z-index: 2;
+  }
+  .showcase-card .tilt-glow { border-radius: var(--radius-lg); }
+
+  /* ============================ FAQ ============================ */
+  .faq {
+    margin-top: 4rem;
+  }
+  .faq-list {
+    margin-top: 2rem;
+  }
+
+  /* ============================ CTA BAND ============================ */
+  .cta-band {
+    position: relative;
+    margin-top: 4rem;
+    padding: clamp(2.5rem, 6vw, 4rem) clamp(1.5rem, 5vw, 3rem);
+    text-align: center;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .cta-inner {
+    position: relative;
+    z-index: 1;
+  }
+  .cta-band h2 {
+    font-size: clamp(1.6rem, 3.4vw, 2.4rem);
+    margin: 0 0 0.75rem;
+    letter-spacing: -0.02em;
+  }
+  .cta-band p {
+    color: var(--color-muted);
+    max-width: 32rem;
+    margin: 0 auto 1.75rem;
+    font-size: 1.05rem;
+    line-height: 1.6;
+  }
+
+  @media (max-width: 640px) {
+    .hero { min-height: auto; }
+    .scroll-indicator { display: none; }
+  }
+</style>

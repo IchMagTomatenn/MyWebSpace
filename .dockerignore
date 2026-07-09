@@ -3,8 +3,12 @@ dist
 .astro
 .git
 .gitignore
-.env
-.env.*
+
+# Exclude env files at any level (root, remark42/, etc.) so no secrets
+# end up baked into the published image via `COPY . .`.
+**/.env
+**/.env.*
+
 PLAN
 README.md
 *.log

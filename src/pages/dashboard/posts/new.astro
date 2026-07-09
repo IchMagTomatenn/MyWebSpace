@@ -1,0 +1,17 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import PostEditor from '../../../components/PostEditor.astro';
+import { getLangFromUrl, t } from '../../../i18n/utils';
+import { defaultLang, type Lang } from '../../../i18n/ui';
+
+const lang: Lang = getLangFromUrl(Astro.url) ?? defaultLang;
+
+const me = Astro.locals.user;
+if (!me) {
+  return Astro.redirect(lang === defaultLang ? '/login' : `/${lang}/login`);
+}
+---
+
+<BaseLayout title={t(lang, 'posts.editor.new_title')}>
+  <PostEditor mode="new" />
+</BaseLayout>

@@ -1,0 +1,26 @@
+---
+import type { APIRoute } from 'astro';
+import { auth } from '../../../lib/auth';
+import { appendFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const dbg = (msg: string) =>
+  appendFileSync(join(tmpdir(), 'auth-debug.log'), `[${new Date().toISOString()}] ${msg}\n`);
+
+// Better Auth catch-all API handler. All auth routes live under /api/auth/*
+export const ALL: APIRoute = async ({ request }) => {
+  dbg(`handler called: ${request.method} ${new URL(request.url).pathname}`);
+  try {
+    const res = await auth.handler(request);
+    dbg(`handler returned: ${res.status} ${res.headers.get('content-type')}`);
+    return res;
+  } catch (err) {
+    dbg(`handler threw: ${String(err)}`);
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+};
+---

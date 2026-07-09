@@ -12,11 +12,18 @@ yarn-error.log*
 pnpm-debug.log*
 
 # environment variables
+# Astro loads .env, .env.local, .env.<mode>, .env.<mode>.local — ignore all
+# variants so no secrets are ever committed accidentally.
 .env
-.env.production
+.env.*
+!.env.example
 
 # macOS-specific files
 .DS_Store
 
 # astro
 .astro/
+
+# user uploads (local dev only; Railway uses a volume).
+# Anchored to repo root so it does NOT ignore the route dir src/pages/uploads/.
+/uploads/

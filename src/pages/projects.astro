@@ -1,0 +1,42 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getLangFromUrl, t } from '../i18n/utils';
+import { defaultLang, type Lang } from '../i18n/ui';
+
+const lang: Lang = getLangFromUrl(Astro.url) ?? defaultLang;
+// Placeholder until Step 12 wires real DB queries (project gallery + tag filter).
+const projects: { slug: string; title: string }[] = [];
+---
+
+<BaseLayout title={t(lang, 'nav.projects')}>
+  <section style="padding-block: 2rem;">
+    <h1>{t(lang, 'nav.projects')}</h1>
+    {
+      projects.length === 0 ? (
+        <p style="color: var(--color-muted);">{t(lang, 'projects.empty')}</p>
+      ) : (
+        <ul class="proj-list">
+          {projects.map((project) => (
+            <li><a href={`/projects/${project.slug}`}>{project.title}</a></li>
+          ))}
+        </ul>
+      )
+    }
+  </section>
+</BaseLayout>
+
+<style>
+  .proj-list {
+    list-style: none;
+    margin: 1rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+  .proj-list li {
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+  }
+</style>

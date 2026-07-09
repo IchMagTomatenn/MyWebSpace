@@ -1,0 +1,79 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getLangFromUrl, t } from '../i18n/utils';
+import { defaultLang, type Lang } from '../i18n/ui';
+
+const lang: Lang = getLangFromUrl(Astro.url) ?? defaultLang;
+const l = (path: string) => (lang === defaultLang ? path : `/${lang}${path}`);
+
+// Status banners after email verification / password reset redirects here.
+const sp = Astro.url.searchParams;
+const justVerified = sp.get('verified') === '1';
+const justReset = sp.get('reset') === '1';
+---
+
+<BaseLayout title={t(lang, 'auth.login.title')}>
+  <section style="padding-block: clamp(2rem, 6vw, 4rem);">
+    <form id="login-form" class="card" novalidate>
+      <h1>{t(lang, 'auth.login.title')}</h1>
+      <p class="subtitle">{t(lang, 'auth.login.subtitle')}</p>
+
+      {(justVerified || justReset) && (
+        <p class="form-msg success">
+          {justVerified ? t(lang, 'auth.verify_email.verified') : t(lang, 'auth.reset.success')}
+        </p>
+      )}
+
+      <div class="field">
+        <label for="email">{t(lang, 'auth.email')}</label>
+        <input id="email" name="email" type="email" autocomplete="email" required />
+      </div>
+      <div class="field">
+        <label for="password">{t(lang, 'auth.password')}</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">{t(lang, 'auth.submit.login')}</button>
+        <p class="form-meta"><a href={l('/forgot-password')}>{t(lang, 'auth.forgot_password')}</a></p>
+      </div>
+      <p id="msg" class="form-msg error" hidden></p>
+      <p class="auth-alt form-meta">
+        {t(lang, 'auth.no_account')} <a href={l('/register')}>{t(lang, 'nav.register')}</a>
+      </p>
+    </form>
+  </section>
+
+  <span id="i18n" class="visually-hidden" data-generic={t(lang, 'auth.error.generic')} data-required={t(lang, 'auth.error.required')} data-dash={l('/dashboard')}></span>
+
+  <script>
+    import { authClient } from '../lib/auth-client';
+    const i18n = document.getElementById('i18n')!.dataset as Record<string, string>;
+    const form = document.getElementById('login-form')! as HTMLFormElement;
+    const msg = document.getElementById('msg')!;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.hidden = true;
+      const data = new FormData(form);
+      const email = String(data.get('email') ?? '').trim();
+      const password = String(data.get('password') ?? '');
+      if (!email || !password) {
+        msg.textContent = i18n.required;
+        msg.hidden = false;
+        return;
+      }
+      try {
+        const res = await authClient.signIn.email({ email, password });
+        if (res.error) {
+          msg.textContent = res.error.message ?? i18n.generic;
+          msg.hidden = false;
+          return;
+        }
+        window.location.href = i18n.dash;
+      } catch (err) {
+        msg.textContent = i18n.generic;
+        msg.hidden = false;
+      }
+    });
+  </script>
+</BaseLayout>

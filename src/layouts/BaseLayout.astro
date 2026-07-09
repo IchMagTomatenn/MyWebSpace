@@ -3,7 +3,7 @@ import { getLangFromUrl, t } from '../i18n/utils';
 import { defaultLang, type Lang } from '../i18n/ui';
 import LanguageSwitcher from '../components/LanguageSwitcher.astro';
 import ThemeToggle from '../components/ThemeToggle.astro';
-import SocialLinks from '../components/SocialLinks.astro';
+import UserMenu from '../components/UserMenu.astro';
 import '../styles/global.css';
 
 interface Props {
@@ -19,10 +19,8 @@ const description = Astro.props.description ?? t(lang, 'site.tagline');
 
 const navItems: Array<{ key: any; href: string }> = [
   { key: 'nav.home', href: lang === defaultLang ? '/' : `/${lang}` },
+  { key: 'nav.posts', href: lang === defaultLang ? '/posts' : `/${lang}/posts` },
   { key: 'nav.projects', href: lang === defaultLang ? '/projects' : `/${lang}/projects` },
-  { key: 'nav.blog', href: lang === defaultLang ? '/blog' : `/${lang}/blog` },
-  { key: 'nav.guestbook', href: lang === defaultLang ? '/guestbook' : `/${lang}/guestbook` },
-  { key: 'nav.contact', href: lang === defaultLang ? '/contact' : `/${lang}/contact` },
 ];
 
 const year = new Date().getFullYear();
@@ -73,6 +71,7 @@ const year = new Date().getFullYear();
         <div class="header-actions">
           <LanguageSwitcher lang={lang} currentPath={currentPath} />
           <ThemeToggle />
+          <UserMenu />
         </div>
       </div>
     </header>
@@ -91,7 +90,6 @@ const year = new Date().getFullYear();
             {t(lang, 'footer.built_with')}
           </span>
         </div>
-        <SocialLinks />
       </div>
     </footer>
 

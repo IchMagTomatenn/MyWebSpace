@@ -1,0 +1,427 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getLangFromUrl, t } from '../i18n/utils';
+import { defaultLang, type Lang } from '../i18n/ui';
+import { db } from '../db';
+import { blogPosts, user } from '../db/schema';
+import { desc, count } from 'drizzle-orm';
+
+const lang: Lang = getLangFromUrl(Astro.url) ?? defaultLang;
+const l = (path: string) => (lang === defaultLang ? path : `/${lang}${path}`);
+
+const me = Astro.locals.user;
+if (!me) {
+  return Astro.redirect(l('/login'));
+}
+if (me.role !== 'admin') {
+  return Astro.redirect(l('/dashboard'));
+}
+
+// ---- Posts (all users, newest first) ----
+let posts: Array<{
+  id: string;
+  slug: string;
+  published: boolean;
+  views: number;
+  createdAt: Date;
+  authorName: string;
+  authorEmail: string;
+  title: string;
+}> = [];
+try {
+  const rows = await db.query.blogPosts.findMany({
+    with: { translations: true, user: true },
+  });
+  posts = rows
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .map((p) => {
+      const tr = p.translations.find((x) => x.lang === lang) ?? p.translations[0];
+      return {
+        id: p.id,
+        slug: p.slug,
+        published: p.published,
+        views: p.views,
+        createdAt: p.createdAt,
+        authorName: p.user.name,
+        authorEmail: p.user.email,
+        title: tr?.title ?? p.slug,
+      };
+    });
+} catch (err) {
+  console.error('[admin] posts list query failed:', err);
+}
+
+// ---- Users (all, newest first) with post counts ----
+let users: Array<{
+  id: string;
+  name: string;
+  email: string;
+  username: string | null;
+  role: string;
+  emailVerified: boolean;
+  createdAt: Date;
+  postCount: number;
+}> = [];
+try {
+  const rows = await db
+    .select({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      username: user.username,
+      role: user.role,
+      emailVerified: user.emailVerified,
+      createdAt: user.createdAt,
+    })
+    .from(user)
+    .orderBy(desc(user.createdAt));
+
+  const counts = await db
+    .select({ userId: blogPosts.userId, n: count() })
+    .from(blogPosts)
+    .groupBy(blogPosts.userId);
+  const countMap = new Map(counts.map((c) => [c.userId, Number(c.n)]));
+
+  users = rows.map((u) => ({
+    ...u,
+    postCount: countMap.get(u.id) ?? 0,
+  }));
+} catch (err) {
+  console.error('[admin] users list query failed:', err);
+}
+
+const fmtDate = (d: Date) =>
+  new Date(d).toLocaleDateString(lang === 'en' ? 'en-US' : 'de-DE', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+---
+
+<BaseLayout title={t(lang, 'admin.title')}>
+  <section style="padding-block: 2rem;">
+    <header class="page-head">
+      <div>
+        <h1>{t(lang, 'admin.title')}</h1>
+        <p class="subtitle">{t(lang, 'admin.subtitle')}</p>
+      </div>
+    </header>
+
+    <div class="tabs" role="tablist">
+      <button class="tab tab-active" type="button" data-tab="posts" role="tab" aria-selected="true">
+        {t(lang, 'admin.tab.posts')}
+        <span class="tab-count">{posts.length}</span>
+      </button>
+      <button class="tab" type="button" data-tab="users" role="tab" aria-selected="false">
+        {t(lang, 'admin.tab.users')}
+        <span class="tab-count">{users.length}</span>
+      </button>
+    </div>
+
+    <!-- Posts tab -->
+    <section class="tab-panel" data-panel="posts">
+      {posts.length === 0 ? (
+        <p class="empty">{t(lang, 'admin.posts.empty')}</p>
+      ) : (
+        <ul class="post-list" id="post-list">
+          {posts.map((p) => (
+            <li class="post-row" data-id={p.id}>
+              <div class="row-main">
+                <span class="row-title">{p.title}</span>
+                <div class="row-meta">
+                  <span class={'badge ' + (p.published ? 'badge-pub' : 'badge-draft')}>
+                    {p.published ? t(lang, 'posts.status.published') : t(lang, 'posts.status.draft')}
+                  </span>
+                  <span class="sep">·</span>
+                  <span>{t(lang, 'admin.posts.author')}: {p.authorName} <span class="muted">({p.authorEmail})</span></span>
+                  <span class="sep">·</span>
+                  <span>{t(lang, 'posts.created')} {fmtDate(p.createdAt)}</span>
+                  <span class="sep">·</span>
+                  <span class="slug">/{p.slug}</span>
+                </div>
+              </div>
+              <div class="row-actions">
+                <button class="btn btn-ghost btn-sm del-post" type="button" data-id={p.id}>
+                  {t(lang, 'posts.delete')}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+
+    <!-- Users tab -->
+    <section class="tab-panel" hidden data-panel="users">
+      {users.length === 0 ? (
+        <p class="empty">{t(lang, 'admin.users.empty')}</p>
+      ) : (
+        <ul class="user-list" id="user-list">
+          {users.map((u) => (
+            <li class="user-row" data-id={u.id} data-self={u.id === me.id ? 'true' : 'false'}>
+              <div class="row-main">
+                <span class="row-title">
+                  {u.name}
+                  {u.username && <span class="muted"> @{u.username}</span>}
+                </span>
+                <div class="row-meta">
+                  <span class={'badge ' + (u.role === 'admin' ? 'badge-admin' : 'badge-user')}>
+                    {u.role === 'admin' ? t(lang, 'admin.users.role.admin') : t(lang, 'admin.users.role.user')}
+                  </span>
+                  <span class="sep">·</span>
+                  <span class="muted">{u.email}</span>
+                  <span class="sep">·</span>
+                  <span class={'badge ' + (u.emailVerified ? 'badge-pub' : 'badge-draft')}>
+                    {u.emailVerified ? t(lang, 'admin.users.verified') : t(lang, 'admin.users.unverified')}
+                  </span>
+                  <span class="sep">·</span>
+                  <span>{t(lang, 'admin.users.posts')}: {u.postCount}</span>
+                  <span class="sep">·</span>
+                  <span>{t(lang, 'profile.joined')} {fmtDate(u.createdAt)}</span>
+                </div>
+              </div>
+              <div class="row-actions">
+                {u.id === me.id ? (
+                  <span class="self-note">{t(lang, 'admin.users.self_protected')}</span>
+                ) : (
+                  <>
+                    {u.role === 'admin' ? (
+                      <button class="btn btn-ghost btn-sm role-toggle" type="button" data-id={u.id} data-role="user">
+                        {t(lang, 'admin.users.make_user')}
+                      </button>
+                    ) : (
+                      <button class="btn btn-ghost btn-sm role-toggle" type="button" data-id={u.id} data-role="admin">
+                        {t(lang, 'admin.users.make_admin')}
+                      </button>
+                    )}
+                    <button class="btn btn-ghost btn-sm del-user" type="button" data-id={u.id}>
+                      {t(lang, 'admin.users.delete')}
+                    </button>
+                  </>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+
+    <p class="back"><a href={l('/dashboard')}>← {t(lang, 'dashboard.title')}</a></p>
+  </section>
+
+  <span id="i18n" class="visually-hidden"
+    data-confirm-post={t(lang, 'posts.confirm_delete')}
+    data-confirm-user={t(lang, 'admin.users.confirm_delete')}
+    data-not-found={t(lang, 'admin.error.not_found')}
+    data-failed={t(lang, 'admin.error.failed')}
+    data-forbidden={t(lang, 'admin.error.forbidden')}
+  ></span>
+
+  <script>
+    const i18n = document.getElementById('i18n')!.dataset as Record<string, string>;
+
+    // ---- Tabs ----
+    const tabs = document.querySelectorAll<HTMLButtonElement>('.tab');
+    const panels = document.querySelectorAll<HTMLElement>('.tab-panel');
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const name = tab.dataset.tab!;
+        tabs.forEach((t2) => {
+          const on = t2 === tab;
+          t2.classList.toggle('tab-active', on);
+          t2.setAttribute('aria-selected', String(on));
+        });
+        panels.forEach((p) => {
+          p.hidden = p.dataset.panel !== name;
+        });
+      });
+    });
+
+    // ---- Posts: delete ----
+    const postList = document.getElementById('post-list');
+    postList?.addEventListener('click', async (e) => {
+      const btn = (e.target as HTMLElement).closest('.del-post') as HTMLButtonElement | null;
+      if (!btn) return;
+      const id = btn.dataset.id!;
+      if (!confirm(i18n['confirm-post'] ?? '')) return;
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/api/admin/posts/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          btn.closest('.post-row')?.remove();
+        } else {
+          alert(res.status === 404 ? i18n['not-found'] : i18n.failed);
+          btn.disabled = false;
+        }
+      } catch {
+        alert(i18n.failed);
+        btn.disabled = false;
+      }
+    });
+
+    // ---- Users: role toggle ----
+    const userList = document.getElementById('user-list');
+    userList?.addEventListener('click', async (e) => {
+      const roleBtn = (e.target as HTMLElement).closest('.role-toggle') as HTMLButtonElement | null;
+      const delBtn = (e.target as HTMLElement).closest('.del-user') as HTMLButtonElement | null;
+
+      if (roleBtn) {
+        const id = roleBtn.dataset.id!;
+        const role = roleBtn.dataset.role!;
+        roleBtn.disabled = true;
+        try {
+          const res = await fetch(`/api/admin/users/${id}`, {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ role }),
+          });
+          if (res.ok) {
+            // Refresh to reflect the new role + button label.
+            window.location.reload();
+          } else {
+            alert(res.status === 403 ? i18n.forbidden : i18n.failed);
+            roleBtn.disabled = false;
+          }
+        } catch {
+          alert(i18n.failed);
+          roleBtn.disabled = false;
+        }
+        return;
+      }
+
+      if (delBtn) {
+        const id = delBtn.dataset.id!;
+        if (!confirm(i18n['confirm-user'] ?? '')) return;
+        delBtn.disabled = true;
+        try {
+          const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            delBtn.closest('.user-row')?.remove();
+          } else {
+            alert(res.status === 404 ? i18n['not-found'] : i18n.failed);
+            delBtn.disabled = false;
+          }
+        } catch {
+          alert(i18n.failed);
+          delBtn.disabled = false;
+        }
+      }
+    });
+  </script>
+</BaseLayout>
+
+<style>
+  .page-head {
+    margin-bottom: 1.25rem;
+  }
+  .page-head h1 { margin: 0; }
+  .subtitle { color: var(--color-muted); margin: 0.25rem 0 0; }
+
+  .tabs {
+    display: flex;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: 1.25rem;
+  }
+  .tab {
+    font: inherit;
+    font-size: 0.95rem;
+    color: var(--color-muted);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 0.6rem 0.9rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .tab:hover { color: var(--color-text); }
+  .tab-active {
+    color: var(--color-text);
+    border-bottom-color: var(--color-accent);
+  }
+  .tab-count {
+    font-size: 0.72rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    padding: 0.05rem 0.4rem;
+  }
+
+  .empty { color: var(--color-muted); }
+  .post-list, .user-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+  .post-row, .user-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    flex-wrap: wrap;
+  }
+  .row-main { min-width: 0; flex: 1 1 20rem; }
+  .row-title {
+    color: var(--color-text);
+    font-weight: 600;
+    font-size: 1.05rem;
+  }
+  .row-meta {
+    margin-top: 0.25rem;
+    font-size: 0.82rem;
+    color: var(--color-muted);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .muted { opacity: 0.7; }
+  .sep { opacity: 0.4; }
+  .slug { font-family: var(--font-mono); font-size: 0.8rem; }
+  .badge {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-draft, .badge-user { color: var(--color-muted); }
+  .badge-pub {
+    color: #15803d;
+    border-color: color-mix(in srgb, #15803d 40%, transparent);
+    background: color-mix(in srgb, #15803d 10%, transparent);
+  }
+  .badge-admin {
+    color: #b45309;
+    border-color: color-mix(in srgb, #b45309 40%, transparent);
+    background: color-mix(in srgb, #b45309 10%, transparent);
+  }
+  :root.dark .badge-pub {
+    color: #86efac;
+    border-color: color-mix(in srgb, #86efac 40%, transparent);
+  }
+  :root.dark .badge-admin {
+    color: #fcd34d;
+    border-color: color-mix(in srgb, #fcd34d 40%, transparent);
+  }
+  .row-actions { display: flex; gap: 0.5rem; flex-shrink: 0; align-items: center; }
+  .btn-sm { padding: 0.4rem 0.7rem; font-size: 0.85rem; }
+  .self-note {
+    font-size: 0.8rem;
+    color: var(--color-muted);
+    font-style: italic;
+  }
+  .back { margin-top: 2rem; }
+  .back a { color: var(--color-muted); }
+  .back a:hover { color: var(--color-accent); }
+</style>
