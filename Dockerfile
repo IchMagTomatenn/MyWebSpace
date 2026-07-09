@@ -23,9 +23,13 @@ FROM node:22-alpine AS runtime
 
 WORKDIR /app
 
-# Install only production dependencies (better-auth, drizzle, pg, …).
+# Install only production dependencies (better-auth, drizzle-orm, pg, …).
+# `--ignore-scripts` skips postinstall scripts: runtime deps need none, and
+# this avoids drizzle-kit's bundled old esbuild (pulled in transitively)
+# crashing its version-validation postinstall. Build-time tools that need
+# scripts (astro/esbuild) run only in the build stage above.
 COPY package.json package-lock.json* ./
-RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
+RUN npm install --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
 
 # Astro's Node adapter writes the entry to ./dist/server/entry.mjs.
 COPY --from=build /app/dist ./dist
