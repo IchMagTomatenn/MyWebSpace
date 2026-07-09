@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.6
 
 # ---- Stage 1: build the SSR server with Node/Astro ----
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ RUN npm run build
 
 
 # ---- Stage 2: runtime (Node SSR) ----
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 
 WORKDIR /app
 
