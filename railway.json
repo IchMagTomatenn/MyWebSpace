@@ -5,7 +5,7 @@
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "startCommand": "caddy run --config /etc/caddy/Caddyfile --adapter caddyfile",
+    "startCommand": "node ./dist/server/entry.mjs",
     "healthcheckPath": "/",
     "healthcheckTimeout": 30,
     "restartPolicyMaxRetries": 3
